@@ -8,6 +8,7 @@ const propertyRoutes   = require('./routes/properties');
 const leadRoutes       = require('./routes/leads');
 const analyticsRoutes  = require('./routes/analytics');
 const userRoutes       = require('./routes/users');
+const aiRoutes         = require('./routes/ai');
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -34,6 +35,7 @@ app.use('/api/properties', propertyRoutes);
 app.use('/api/leads',      leadRoutes);
 app.use('/api/analytics',  analyticsRoutes);
 app.use('/api/users',      userRoutes);
+app.use('/api/ai',         aiRoutes);
 
 // ─── Health check ─────────────────────────────────────────
 app.get('/api/health', (req, res) =>

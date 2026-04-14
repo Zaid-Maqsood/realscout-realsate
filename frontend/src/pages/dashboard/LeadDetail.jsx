@@ -1,23 +1,28 @@
 import { useParams, Link } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { usePageContext } from '../../context/PageContextContext';
 import {
   ArrowLeft, Mail, Phone, Building2, Calendar,
-  User, Send, MessageSquare,
+  User, Send, MessageSquare, Sparkles, Copy, X,
 } from 'lucide-react';
 import api from '../../api/axios';
 import { formatDate, formatTimeAgo, STATUS_COLORS, LEAD_STATUSES, STATUS_LABELS, formatPrice } from '../../utils/formatters';
 import { PageLoader } from '../../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import { useDraftReply } from '../../hooks/useAI';
 
 export default function LeadDetail() {
   const { id } = useParams();
   const qc = useQueryClient();
   const { user } = useAuth();
   const [note, setNote] = useState('');
+  const [draftReply, setDraftReply] = useState('');
+  const [showDraftModal, setShowDraftModal] = useState(false);
   const isAdmin = user?.role === 'admin';
+  const draftAI = useDraftReply();
 
   const { data: lead, isLoading } = useQuery({
     queryKey: ['lead', id],
@@ -50,10 +55,24 @@ export default function LeadDetail() {
     onError: () => toast.error('Failed to add note'),
   });
 
+  const { updatePageContext } = usePageContext();
+  useEffect(() => {
+    if (!lead) return;
+    updatePageContext(
+      `Viewing lead: ${lead.name} (${lead.email}${lead.phone ? ', ' + lead.phone : ''}). ` +
+      `Status: ${lead.status}. ` +
+      (lead.property_title ? `Interested in: "${lead.property_title}" ($${Number(lead.property_price).toLocaleString()}, ${lead.property_city}). ` : '') +
+      (lead.message ? `Their message: "${lead.message}". ` : '') +
+      (lead.agent_name ? `Assigned to: ${lead.agent_name}. ` : 'Unassigned. ') +
+      `Notes: ${lead.notes?.length || 0}.`
+    );
+  }, [lead]);
+
   if (isLoading) return <PageLoader />;
   if (!lead) return <div className="text-center py-16 text-text-muted">Lead not found</div>;
 
   return (
+    <>
     <div className="max-w-4xl space-y-5">
       <Link to="/dashboard/leads" className="btn-ghost text-sm">
         <ArrowLeft size={16} /> Back to Leads
@@ -109,9 +128,36 @@ export default function LeadDetail() {
 
           {/* Notes */}
           <div className="card p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <MessageSquare size={16} className="text-primary" />
-              <h3 className="font-heading text-base font-semibold text-text">Notes ({lead.notes?.length || 0})</h3>
+            <div className="flex items-center justify-between gap-2 mb-4">
+              <div className="flex items-center gap-2">
+                <MessageSquare size={16} className="text-primary" />
+                <h3 className="font-heading text-base font-semibold text-text">Notes ({lead.notes?.length || 0})</h3>
+              </div>
+              <button
+                onClick={async () => {
+                  const result = await draftAI.call({
+                    leadName: lead.name,
+                    leadMessage: lead.message,
+                    propertyTitle: lead.property_title,
+                    propertyPrice: lead.property_price,
+                    propertyCity: lead.property_city,
+                    leadStatus: lead.status,
+                  });
+                  if (result?.reply) {
+                    setDraftReply(result.reply);
+                    setShowDraftModal(true);
+                  } else {
+                    toast.error('Could not generate reply');
+                  }
+                }}
+                disabled={draftAI.loading}
+                className="flex items-center gap-1.5 text-xs bg-primary/10 text-primary px-2.5 py-1.5 rounded-lg hover:bg-primary/20 transition-colors cursor-pointer font-medium shrink-0"
+              >
+                {draftAI.loading
+                  ? <span className="w-3 h-3 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
+                  : <Sparkles size={11} />}
+                Draft Reply
+              </button>
             </div>
 
             {/* Note list */}
@@ -221,5 +267,44 @@ export default function LeadDetail() {
         </div>
       </div>
     </div>
+
+    {/* Draft Reply Modal */}
+
+    {showDraftModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+        <div className="bg-surface rounded-2xl shadow-2xl max-w-lg w-full p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles size={16} className="text-primary" />
+              <h3 className="font-heading text-base font-semibold text-text">AI Draft Reply</h3>
+            </div>
+            <button onClick={() => setShowDraftModal(false)} className="p-1.5 rounded-lg hover:bg-background text-text-muted cursor-pointer">
+              <X size={16} />
+            </button>
+          </div>
+          <textarea
+            value={draftReply}
+            onChange={(e) => setDraftReply(e.target.value)}
+            rows={8}
+            className="input-field w-full resize-none text-sm mb-4"
+          />
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(draftReply);
+                toast.success('Copied to clipboard!');
+              }}
+              className="btn-outline flex-1 justify-center"
+            >
+              <Copy size={14} /> Copy
+            </button>
+            <button onClick={() => setShowDraftModal(false)} className="btn-primary flex-1 justify-center">
+              Done
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   );
 }

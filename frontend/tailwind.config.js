@@ -38,9 +38,15 @@ export default {
         'card-hover': '0 8px 24px rgba(15, 118, 110, 0.16)',
         sidebar:      '4px 0 24px rgba(15, 118, 110, 0.06)',
       },
+      keyframes: {
+        'fade-in': { from: { opacity: '0', transform: 'translateY(6px)' }, to: { opacity: '1', transform: 'translateY(0)' } },
+      },
+      animation: {
+        'fade-in': 'fade-in 0.25s ease-out',
+      },
       transitionDuration: { DEFAULT: '200ms' },
       borderRadius: { xl: '0.75rem', '2xl': '1rem' },
     },
   },
-  plugins: [],
+  plugins: [require('@tailwindcss/typography')],
 };

@@ -9,6 +9,8 @@ import PublicNavbar from '../../components/layout/PublicNavbar';
 import ImageGallery from '../../components/properties/ImageGallery';
 import LeadForm from '../../components/leads/LeadForm';
 import { PageLoader } from '../../components/ui/LoadingSpinner';
+import SimilarProperties from '../../components/ai/SimilarProperties';
+import PropertyChatWidget from '../../components/ai/PropertyChatWidget';
 import { formatPrice, formatDate, STATUS_COLORS, TYPE_COLORS, STATUS_LABELS } from '../../utils/formatters';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
@@ -171,6 +173,9 @@ export default function PropertyDetail() {
               </div>
             )}
 
+            {/* Similar Properties */}
+            <SimilarProperties propertyId={id} />
+
             {/* Actions */}
             <div className="flex gap-3">
               <Link to="/browse" className="btn-outline flex-1 justify-center">
@@ -189,6 +194,9 @@ export default function PropertyDetail() {
           </div>
         </div>
       </div>
+
+      {/* AI Chat Widget */}
+      <PropertyChatWidget propertyId={id} property={property} />
     </div>
   );
 }

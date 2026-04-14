@@ -14,6 +14,7 @@
 # Claude & Playwright tooling
 .claude/
 .playwright-mcp/
+CLAUDE.md
 
 # Dependencies
 node_modules/

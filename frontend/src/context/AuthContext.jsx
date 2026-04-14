@@ -20,6 +20,7 @@ export function AuthProvider({ children }) {
   const login = useCallback((tokenValue, userData) => {
     localStorage.setItem('propvista_token', tokenValue);
     localStorage.setItem('propvista_user', JSON.stringify(userData));
+    sessionStorage.setItem('ai_banner_pending', '1');
     setToken(tokenValue);
     setUser(userData);
   }, []);

@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Pencil, Trash2, Eye, Home, BedDouble, Bath, Maximize2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { usePageContext } from '../../context/PageContextContext';
 import { formatPrice, formatDate, STATUS_COLORS, STATUS_LABELS, TYPE_COLORS } from '../../utils/formatters';
 import Modal from '../../components/ui/Modal';
 import PropertyForm from '../../components/properties/PropertyForm';
@@ -77,6 +78,15 @@ export default function MyProperties() {
   };
 
   const properties = data?.properties || [];
+
+  const { updatePageContext } = usePageContext();
+  useEffect(() => {
+    if (!properties.length) return;
+    const list = properties
+      .map((p) => `"${p.title}" — ${p.type}, ${p.city}, $${Number(p.price).toLocaleString()}, ${p.status}`)
+      .join('; ');
+    updatePageContext(`My Properties — ${properties.length} listing(s) owned by ${user?.name}: ${list}.`);
+  }, [properties.length]);
 
   return (
     <div className="space-y-6">

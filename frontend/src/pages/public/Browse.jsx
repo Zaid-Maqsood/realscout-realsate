@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
+import { usePageContext } from '../../context/PageContextContext';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { SlidersHorizontal, X, Building2 } from 'lucide-react';
+import { SlidersHorizontal, X, Building2, Sparkles } from 'lucide-react';
 import api from '../../api/axios';
+import { useParseSearch } from '../../hooks/useAI';
+import toast from 'react-hot-toast';
 import PublicNavbar from '../../components/layout/PublicNavbar';
 import PropertyCard from '../../components/properties/PropertyCard';
 import Pagination from '../../components/ui/Pagination';
@@ -26,6 +29,8 @@ export default function Browse() {
     featured: searchParams.get('featured') || '',
   });
   const [page, setPage] = useState(1);
+  const [nlQuery, setNlQuery] = useState('');
+  const parseAI = useParseSearch();
 
   useEffect(() => {
     setPage(1);
@@ -55,6 +60,33 @@ export default function Browse() {
 
   const activeFilterCount = Object.entries(filters).filter(([k, v]) => v && k !== 'status').length;
 
+  const { updatePageContext } = usePageContext();
+  useEffect(() => {
+    if (!data) return;
+    const activeFilters = Object.entries(filters).filter(([k, v]) => v && k !== 'status').map(([k, v]) => `${k}=${v}`).join(', ');
+    const sample = (data.properties || []).slice(0, 5).map((p) => `"${p.title}" (${p.type}, ${p.city}, $${Number(p.price).toLocaleString()})`).join('; ');
+    updatePageContext(
+      `Showing ${data.total ?? 0} properties.` +
+      (activeFilters ? ` Active filters: ${activeFilters}.` : ' No filters active.') +
+      (sample ? ` Sample listings: ${sample}.` : '')
+    );
+  }, [data, filters]);
+
+  const handleAISearch = async () => {
+    if (!nlQuery.trim()) return;
+    const result = await parseAI.call({ query: nlQuery });
+    if (result?.filters && Object.keys(result.filters).length > 0) {
+      const merged = { type: '', city: '', status: 'available', min_price: '', max_price: '', bedrooms: '', search: '', featured: '', ...result.filters };
+      setFilters(merged);
+      const newParams = new URLSearchParams();
+      Object.entries(merged).forEach(([k, v]) => { if (v) newParams.set(k, v); });
+      setSearchParams(newParams);
+      toast.success('Filters applied from your search!');
+    } else {
+      toast.error('Could not understand search — try being more specific');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <PublicNavbar />
@@ -76,6 +108,27 @@ export default function Browse() {
           >
             <SlidersHorizontal size={16} />
             Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
+          </button>
+        </div>
+
+        {/* AI Natural Language Search */}
+        <div className="flex gap-2 mb-4">
+          <input
+            value={nlQuery}
+            onChange={(e) => setNlQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleAISearch()}
+            placeholder='Try: "3 bedroom house in Lahore under $300k"'
+            className="input-field flex-1"
+          />
+          <button
+            onClick={handleAISearch}
+            disabled={parseAI.loading || !nlQuery.trim()}
+            className="btn-primary shrink-0 flex items-center gap-2"
+          >
+            {parseAI.loading
+              ? <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              : <Sparkles size={15} />}
+            Search with AI
           </button>
         </div>
 

@@ -1,4 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
+import { usePageContext } from '../../context/PageContextContext';
 import {
   Building2, Users, TrendingUp, CheckCircle2,
   ArrowUpRight, BarChart2,
@@ -11,6 +13,8 @@ import { Link } from 'react-router-dom';
 import api from '../../api/axios';
 import { PageLoader } from '../../components/ui/LoadingSpinner';
 import { useAuth } from '../../context/AuthContext';
+import DashboardAISummary from '../../components/ai/DashboardAISummary';
+import StaleLeadsCard from '../../components/ai/StaleLeadsCard';
 
 const STATUS_PALETTE = {
   new:         '#6366F1',
@@ -28,6 +32,17 @@ export default function Dashboard() {
     queryFn: () => api.get('/analytics').then((r) => r.data),
     staleTime: 30000,
   });
+
+  const { updatePageContext } = usePageContext();
+  useEffect(() => {
+    if (!data) return;
+    const topCity = data.topCities?.[0]?.city ?? 'N/A';
+    updatePageContext(
+      `Dashboard metrics — Properties: ${data.properties?.total ?? 0} total, ${data.properties?.available ?? 0} available, ${data.properties?.sold ?? 0} sold, ${data.properties?.rented ?? 0} rented. ` +
+      `Leads: ${data.leads?.total ?? 0} total, ${data.leads?.new ?? 0} new, ${data.leads?.closed ?? 0} closed, conversion rate ${data.leads?.conversionRate ?? 0}%. ` +
+      `Top city: ${topCity}.`
+    );
+  }, [data]);
 
   if (isLoading) return <PageLoader />;
 
@@ -79,6 +94,9 @@ export default function Dashboard() {
           Add Property
         </Link>
       </div>
+
+      {/* AI Summary */}
+      <DashboardAISummary data={data} />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -202,6 +220,8 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      {/* Follow-up Reminders */}
+      <StaleLeadsCard />
     </div>
   );
 }

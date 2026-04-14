@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { usePageContext } from '../../context/PageContextContext';
 import { Eye, Building2, Search, BedDouble, Bath, Maximize2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../../api/axios';
@@ -27,6 +28,25 @@ export default function Properties() {
       return api.get('/properties', { params }).then((r) => r.data);
     },
   });
+
+  const { updatePageContext } = usePageContext();
+  useEffect(() => {
+    if (!data) return;
+    const activeFilters = [
+      search && `search="${search}"`,
+      typeFilter && `type=${typeFilter}`,
+      statusFilter && `status=${statusFilter}`,
+    ].filter(Boolean).join(', ');
+    const list = (data.properties || [])
+      .map((p) => `"${p.title}" — ${p.type}, ${p.city}, $${Number(p.price).toLocaleString()}, ${p.status}`)
+      .join('; ');
+    updatePageContext(
+      `Showing page ${page} of ${data.pages ?? 1} (${data.total ?? 0} total properties).` +
+      (activeFilters ? ` Active filters: ${activeFilters}.` : ' No filters active.') +
+      ` This page has ${data.properties?.length ?? 0} properties: ${list}.` +
+      ` Note: this page only shows 12 at a time — for city/price queries, advise the user to use the search bar and filter dropdowns at the top.`
+    );
+  }, [data, page, search, typeFilter, statusFilter]);
 
   return (
     <div className="space-y-5">

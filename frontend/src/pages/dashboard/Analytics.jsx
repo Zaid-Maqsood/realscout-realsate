@@ -1,12 +1,17 @@
 import { useQuery } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line, Legend, AreaChart, Area,
 } from 'recharts';
-import { Building2, Users, TrendingUp, MapPin, CheckCircle2, XCircle } from 'lucide-react';
+import { Building2, Users, TrendingUp, MapPin, CheckCircle2, XCircle, FileText, Copy, X, Sparkles } from 'lucide-react';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
 import { PageLoader } from '../../components/ui/LoadingSpinner';
+import { useMonthlyReport } from '../../hooks/useAI';
+import ReactMarkdown from 'react-markdown';
+import { usePageContext } from '../../context/PageContextContext';
+import toast from 'react-hot-toast';
 
 const STATUS_PALETTE = {
   new:         '#6366F1',
@@ -36,11 +41,61 @@ export default function Analytics() {
     staleTime: 30000,
   });
   const scoped = data?.scoped || user?.role === 'agent';
+  const [report, setReport] = useState('');
+  const [showReport, setShowReport] = useState(false);
+  const reportAI = useMonthlyReport();
+
+  const { updatePageContext } = usePageContext();
+  useEffect(() => {
+    if (!data) return;
+    const topCities = data.topCities?.slice(0, 3).map((c) => `${c.city} (${c.count})`).join(', ') || 'N/A';
+    const recentLeads = data.leadsOverTime?.slice(-3).map((l) => `${l.month}: ${l.count}`).join(', ') || 'N/A';
+    updatePageContext(
+      `Analytics — Properties: ${data.properties?.total ?? 0} total, ${data.properties?.available ?? 0} available, ${data.properties?.sold ?? 0} sold. ` +
+      `Leads: ${data.leads?.total ?? 0} total, conversion ${data.leads?.conversionRate ?? 0}%. ` +
+      `Top markets: ${topCities}. Recent lead trend: ${recentLeads}.`
+    );
+  }, [data]);
+
+  const handleGenerateReport = async () => {
+    const result = await reportAI.call({
+      properties: data?.properties,
+      leads: data?.leads,
+      leadsByStatus: data?.leadsByStatus,
+      topCities: data?.topCities,
+      propertiesOverTime: data?.propertiesOverTime,
+      leadsOverTime: data?.leadsOverTime,
+    });
+    if (result?.report) {
+      setReport(result.report);
+      setShowReport(true);
+    } else {
+      toast.error('Could not generate report');
+    }
+  };
 
   if (isLoading) return <PageLoader />;
 
   return (
     <div className="space-y-6">
+      {/* Header with Report button */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-heading text-xl font-semibold text-text">Analytics</h2>
+          <p className="text-sm text-text-muted mt-0.5">{scoped ? 'Your performance overview' : 'Platform-wide overview'}</p>
+        </div>
+        <button
+          onClick={handleGenerateReport}
+          disabled={reportAI.loading}
+          className="btn-outline text-sm flex items-center gap-2"
+        >
+          {reportAI.loading
+            ? <span className="w-3.5 h-3.5 border-2 border-primary/40 border-t-primary rounded-full animate-spin" />
+            : <FileText size={15} />}
+          {reportAI.loading ? 'Generating…' : 'Generate Monthly Report'}
+        </button>
+      </div>
+
       {/* KPI Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {STAT_CARDS(data, scoped).map(({ label, value, icon: Icon, color, bg }) => (
@@ -160,6 +215,43 @@ export default function Analytics() {
           </BarChart>
         </ResponsiveContainer>
       </div>
+
+      {/* Monthly Report Modal */}
+      {showReport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-surface rounded-2xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[85vh]">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border shrink-0">
+              <div className="flex items-center gap-2">
+                <Sparkles size={16} className="text-primary" />
+                <h3 className="font-heading text-base font-semibold text-text">Monthly Performance Report</h3>
+              </div>
+              <button onClick={() => setShowReport(false)} className="p-1.5 rounded-lg hover:bg-background text-text-muted cursor-pointer">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto px-6 py-4 prose prose-sm max-w-none
+              prose-headings:font-heading prose-headings:text-text prose-headings:font-semibold
+              prose-h2:text-base prose-h2:mt-5 prose-h2:mb-2
+              prose-p:text-text prose-p:leading-relaxed prose-p:text-sm
+              prose-li:text-sm prose-li:text-text
+              prose-strong:text-text prose-strong:font-semibold
+              prose-ul:my-2 prose-ol:my-2">
+              <ReactMarkdown>{report}</ReactMarkdown>
+            </div>
+            <div className="flex gap-3 px-6 py-4 border-t border-border shrink-0">
+              <button
+                onClick={() => { navigator.clipboard.writeText(report); toast.success('Report copied!'); }}
+                className="btn-outline flex-1 justify-center"
+              >
+                <Copy size={14} /> Copy Report
+              </button>
+              <button onClick={() => setShowReport(false)} className="btn-primary flex-1 justify-center">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

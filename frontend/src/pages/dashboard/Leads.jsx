@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -14,9 +14,18 @@ import { PageLoader } from '../../components/ui/LoadingSpinner';
 import EmptyState from '../../components/ui/EmptyState';
 import toast from 'react-hot-toast';
 import clsx from 'clsx';
+import { useScoreLeads } from '../../hooks/useAI';
+import { usePageContext } from '../../context/PageContextContext';
+
+const SENTIMENT_STYLES = {
+  hot:  'bg-danger/10 text-danger',
+  warm: 'bg-warning/10 text-warning',
+  cold: 'bg-cta/10 text-cta',
+};
+const SENTIMENT_LABEL = { hot: 'Hot', warm: 'Warm', cold: 'Cold' };
 
 // ─── Lead Card ──────────────────────────────────────────────
-function LeadCard({ lead, isDragging }) {
+function LeadCard({ lead, isDragging, sentiment }) {
   const navigate = useNavigate();
   const { attributes, listeners, setNodeRef, transform } = useDraggable({ id: lead.id });
 
@@ -71,16 +80,23 @@ function LeadCard({ lead, isDragging }) {
             <User size={10} />{lead.agent_name}
           </span>
         ) : <span />}
-        <span className="flex items-center gap-1 text-xs text-text-light">
-          <Clock size={10} />{formatTimeAgo(lead.created_at)}
-        </span>
+        <div className="flex items-center gap-1.5">
+          {sentiment && (
+            <span className={clsx('text-xs font-semibold px-1.5 py-0.5 rounded-full', SENTIMENT_STYLES[sentiment])}>
+              {SENTIMENT_LABEL[sentiment]}
+            </span>
+          )}
+          <span className="flex items-center gap-1 text-xs text-text-light">
+            <Clock size={10} />{formatTimeAgo(lead.created_at)}
+          </span>
+        </div>
       </div>
     </div>
   );
 }
 
 // ─── Kanban Column ───────────────────────────────────────────
-function KanbanColumn({ column, leads }) {
+function KanbanColumn({ column, leads, sentiments }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
 
   return (
@@ -100,7 +116,7 @@ function KanbanColumn({ column, leads }) {
         )}
       >
         {leads.map((lead) => (
-          <LeadCard key={lead.id} lead={lead} />
+          <LeadCard key={lead.id} lead={lead} sentiment={sentiments[lead.id]} />
         ))}
         {leads.length === 0 && (
           <div className="h-24 flex items-center justify-center">
@@ -118,6 +134,9 @@ export default function Leads() {
   const { user } = useAuth();
   const isAgent = user?.role === 'agent';
   const [activeId, setActiveId] = useState(null);
+  const [sentiments, setSentiments] = useState({});
+  const scoredRef = useRef(false);
+  const scoreAI = useScoreLeads();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const { data, isLoading } = useQuery({
@@ -132,6 +151,31 @@ export default function Leads() {
   });
 
   const leads = data?.leads || [];
+
+  const { updatePageContext } = usePageContext();
+  useEffect(() => {
+    if (!leads.length) return;
+    const byStatus = KANBAN_COLUMNS.map((col) => `${col.label}: ${leads.filter((l) => l.status === col.id).length}`).join(', ');
+    updatePageContext(`Leads pipeline — Total: ${leads.length}. Breakdown: ${byStatus}.`);
+  }, [leads.length]);
+
+  // Score leads once when data loads
+  useEffect(() => {
+    if (!leads.length || scoredRef.current) return;
+    scoredRef.current = true;
+    scoreAI.call({ leads: leads.map((l) => ({
+      id: l.id,
+      status: l.status,
+      message: l.message,
+      created_at: l.created_at,
+    })) }).then((result) => {
+      if (result?.scores) {
+        const map = {};
+        result.scores.forEach((s) => { map[s.id] = s.sentiment; });
+        setSentiments(map);
+      }
+    });
+  }, [leads.length]);
 
   const getLeadsForColumn = (status) => leads.filter((l) => l.status === status);
 
@@ -195,6 +239,7 @@ export default function Leads() {
                 key={col.id}
                 column={col}
                 leads={getLeadsForColumn(col.id)}
+                sentiments={sentiments}
               />
             ))}
           </div>

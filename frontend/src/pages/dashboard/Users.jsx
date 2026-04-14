@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Trash2, Shield, User, Users } from 'lucide-react';
 import api from '../../api/axios';
 import { useAuth } from '../../context/AuthContext';
+import { usePageContext } from '../../context/PageContextContext';
 import { formatDate } from '../../utils/formatters';
 import { PageLoader } from '../../components/ui/LoadingSpinner';
 import ConfirmDialog from '../../components/ui/ConfirmDialog';
@@ -45,6 +46,20 @@ export default function UsersPage() {
     },
     onError: () => toast.error('Failed to delete user'),
   });
+
+  const { updatePageContext } = usePageContext();
+  useEffect(() => {
+    if (!users.length) return;
+    const admins = users.filter((u) => u.role === 'admin').length;
+    const agents = users.filter((u) => u.role === 'agent').length;
+    const regularUsers = users.filter((u) => u.role === 'user').length;
+    const list = users.map((u) => `${u.name} (${u.role}, ${u.email})`).join('; ');
+    updatePageContext(
+      `Users page — ${users.length} total: ${admins} admin(s), ${agents} agent(s), ${regularUsers} user(s).` +
+      (roleFilter ? ` Filtered by role: ${roleFilter}.` : '') +
+      ` Users: ${list}.`
+    );
+  }, [users.length, roleFilter]);
 
   return (
     <div className="space-y-5">

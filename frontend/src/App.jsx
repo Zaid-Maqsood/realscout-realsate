@@ -4,11 +4,13 @@ import { Toaster } from 'react-hot-toast';
 // Auth
 import { AuthProvider } from './context/AuthContext';
 import { useAuth } from './context/AuthContext';
+import { PageContextProvider } from './context/PageContextContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 import RoleRoute from './routes/RoleRoute';
 
 // Layout
 import AppShell from './components/layout/AppShell';
+import GlobalChatWidget from './components/ai/GlobalChatWidget';
 
 // Public pages
 import Home from './pages/public/Home';
@@ -34,6 +36,7 @@ function DashboardIndex() {
 
 export default function App() {
   return (
+    <PageContextProvider>
     <AuthProvider>
       <Toaster
         position="top-right"
@@ -106,6 +109,9 @@ export default function App() {
         {/* Catch-all */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+
+      <GlobalChatWidget />
     </AuthProvider>
+    </PageContextProvider>
   );
 }
