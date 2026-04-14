@@ -1,0 +1,30 @@
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Text files with sensitive info
+*.txt
+
+# Test screenshots
+*.png
+*.jpg
+*.jpeg
+
+# Claude & Playwright tooling
+.claude/
+.playwright-mcp/
+
+# Dependencies
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Design system (generated)
+design-system/
